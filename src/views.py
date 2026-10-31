@@ -2,6 +2,7 @@ import json
 import os
 import time
 from datetime import datetime
+from json import JSONDecodeError
 from typing import Any
 
 import pandas as pd
@@ -9,6 +10,8 @@ import requests
 from dotenv import load_dotenv
 from pandas import DataFrame
 from requests import RequestException
+
+from src.utils import views_logger
 
 load_dotenv()
 api_key = os.getenv("API_KEY")
@@ -20,13 +23,23 @@ def open_settings(filename: str) -> dict[str, Any] | Any:
     full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", f"{filename}"))
     if filename.endswith("json"):
         try:
+            views_logger.info("Попытка открытия файла настроек")
             with open(full_path) as f:
-                user_settings = json.load(f)
-            return user_settings
+                try:
+                    views_logger.info("Попытка чтения файла настроек")
+                    user_settings = json.load(f)
+                    views_logger.info("Функция успешно завершила работу")
+                    return user_settings
+                except JSONDecodeError as e:
+                    views_logger.error("Ошибка чтения файла настроек")
+                    print(f"Ошибка чтения файла: {e}")
+                    return {}
         except FileNotFoundError as e:
+            views_logger.error("Файл настроек не был найден")
             print(f"Ошибка: {e}")
             return {}
     else:
+        views_logger.error("Обнаружено неверное разрешение файла настроек")
         print("Неверный формат файла настроек")
         return {}
 
@@ -36,6 +49,7 @@ def get_currency_rate(settings: dict[str, list[str]]) -> list[dict[str, Any]]:
     currency_rates = []
     if settings != {}:
         try:
+            views_logger.info("Попытка запроса на сервер курса валют")
             response = requests.get(url=f"https://v6.exchangerate-api.com/v6/{api_key}/latest/RUB", timeout=5)
             response.raise_for_status()
             data = response.json()
@@ -44,31 +58,41 @@ def get_currency_rate(settings: dict[str, list[str]]) -> list[dict[str, Any]]:
                     currency_rates.append(
                         {"currency": f"{currency}", "rate": round(1 / data["conversion_rates"][f"{currency}"], 2)}
                     )
+            views_logger.info("Функция успешно завершила работу")
             return currency_rates
         except RequestException as e:
+            views_logger.error("Ошибка запроса на сервер курса валют")
             print(f"Ошибка при конвертации валюты: {e}")
+            return currency_rates
+    views_logger.warning("Файл настроек пуст, курс валют не определен")
     return currency_rates
 
 
 def get_stock_rate(settings: dict[str, list[str]]) -> list[dict[str, Any]]:
     """Функция выводит текущие курсы акций согласно настройкам в JSON-файле."""
-    stock_rates = []
+    stock_rates: list[Any] = []
     if settings != {}:
         for stock in settings.get("user_stocks", []):
             try:
+                views_logger.info("Попытка запроса на сервер стоимости акций")
                 response = requests.get(
                     url=f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={stock}&apikey={api_key2}",
-                    timeout=5,
-                )
+                    timeout=5)
                 response.raise_for_status()
                 data = response.json()
+            except RequestException as e:
+                views_logger.error("Ошибка запроса на сервер стоимости акций")
+                print(f"Ошибка при запросе информации об акциях: {e}")
+                return stock_rates
+            else:
                 if data.get("Global Quote", {}).get("05. price") is not None:
                     stock_rates.append(
                         {"stock": f"{stock}", "price": round(float(data["Global Quote"]["05. price"]), 2)}
                     )
-            except RequestException as e:
-                print(f"Ошибка при запросе информации об акциях: {e}")
             time.sleep(1.2)
+        views_logger.info("Функция успешно завершила работу")
+        return stock_rates
+    views_logger.warning("Файл настроек пуст, стоимость акций не определена")
     return stock_rates
 
 
@@ -84,6 +108,7 @@ def user_greeting() -> str:
         greeting = "Добрый вечер!"
     else:
         greeting = "Доброй ночи!"
+    views_logger.info("Функция приветствия успешно завершила работу")
     return greeting
 
 
@@ -97,21 +122,28 @@ def file_reader(input_date: str, filename: str) -> DataFrame:
         start_date = datetime.strptime(f"01.{month}.{year} 00:00:00", "%d.%m.%Y %H:%M:%S")
         end_date = datetime.strptime(f"{input_date} 23:59:59", "%d.%m.%Y %H:%M:%S")
         try:
+            views_logger.info("Попытка чтения файла транзакций")
             data = pd.read_excel(full_path)
+        except FileNotFoundError as e:
+            views_logger.error("Файл транзакций не найден")
+            print(f"Ошибка: {e}")
+            return DataFrame({})
+        except Exception as e:
+            views_logger.error("Ошибка чтения файла транзакций")
+            print(f"Возникла непредвиденная ошибка: {e}")
+            return DataFrame({})
+        else:
             data["Дата операции"] = data["Дата операции"].map(
                 lambda date: datetime.strptime(date, "%d.%m.%Y %H:%M:%S")
             )
             filtered_data = data.loc[
-                (data["Дата операции"] <= end_date) & (data["Дата операции"] >= start_date) & (data["Статус"] == "OK")
-            ]
+                (data["Дата операции"] <= end_date) & (data["Дата операции"] >= start_date) & (data["Статус"] == "OK")]
+            views_logger.info("Функция чтения файла транзакций успешно завершила работу")
             return filtered_data
-        except FileNotFoundError as e:
-            print(f"Ошибка: {e}")
-        except Exception as e:
-            print(f"Возникла непредвиденная ошибка: {e}")
     else:
-        raise Exception("Формат файла не поддерживается")
-    return DataFrame({})
+        views_logger.warning("Обнаружено неверное разрешение файла транзакций")
+        print("Формат файла не поддерживается")
+        return DataFrame({})
 
 
 def find_top_five_transactions(operations: DataFrame) -> list[dict[str, Any]]:
@@ -136,7 +168,12 @@ def find_top_five_transactions(operations: DataFrame) -> list[dict[str, Any]]:
                     "description": row["Описание"],
                 }
             )
-    return list_transactions
+        views_logger.info("Функция поиска транзакций успешно завершила работу")
+        return list_transactions
+    else:
+        views_logger.warning("Не найдено ни одной операции")
+        print("Данные об операциях отсутствуют")
+        return list_transactions
 
 
 def get_card_stats(operations: DataFrame) -> list[dict[str, Any]]:
@@ -155,10 +192,13 @@ def get_card_stats(operations: DataFrame) -> list[dict[str, Any]]:
                 {
                     "last_digits": index,
                     "total_spent": -1 * round(row["Сумма операции"], 2),
-                    "cashback": round(row["Кэшбэк"], 2),
-                }
-            )
-    return card_list
+                    "cashback": round(row["Кэшбэк"], 2)})
+        views_logger.info("Функция поиска операций по картам упешно завершила работу")
+        return card_list
+    else:
+        views_logger.warning("Не найдено ни одной операции по картам")
+        print("Данные об операциях отсутствуют")
+        return card_list
 
 
 def main_page(date: str) -> str:
@@ -174,8 +214,10 @@ def main_page(date: str) -> str:
         "stock_prices": get_stock_rate(user_settings),
     }
     json_data = json.dumps(result, indent=4, ensure_ascii=False)
+    views_logger.info("Функция main_page заввершила работу")
     return json_data
 
 
 if __name__ == "__main__":
+    views_logger.info("Функция main_page начала работу")
     print(main_page("31.12.2019"))
