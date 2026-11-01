@@ -24,7 +24,7 @@ def open_settings(filename: str) -> dict[str, Any] | Any:
     if filename.endswith("json"):
         try:
             views_logger.info("Попытка открытия файла настроек")
-            with open(full_path) as f:
+            with open(full_path, encoding="utf-8") as f:
                 try:
                     views_logger.info("Попытка чтения файла настроек")
                     user_settings = json.load(f)
@@ -39,7 +39,7 @@ def open_settings(filename: str) -> dict[str, Any] | Any:
             print(f"Ошибка: {e}")
             return {}
     else:
-        views_logger.error("Обнаружено неверное разрешение файла настроек")
+        views_logger.error("Обнаружено неверное расширение файла настроек")
         print("Неверный формат файла настроек")
         return {}
 
@@ -59,7 +59,6 @@ def get_currency_rate(settings: dict[str, list[str]]) -> list[dict[str, Any]]:
                         {"currency": f"{currency}", "rate": round(1 / data["conversion_rates"][f"{currency}"], 2)}
                     )
             views_logger.info("Функция успешно завершила работу")
-            return currency_rates
         except RequestException as e:
             views_logger.error("Ошибка запроса на сервер курса валют")
             print(f"Ошибка при конвертации валюты: {e}")
@@ -77,7 +76,8 @@ def get_stock_rate(settings: dict[str, list[str]]) -> list[dict[str, Any]]:
                 views_logger.info("Попытка запроса на сервер стоимости акций")
                 response = requests.get(
                     url=f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={stock}&apikey={api_key2}",
-                    timeout=5)
+                    timeout=5,
+                )
                 response.raise_for_status()
                 data = response.json()
             except RequestException as e:
@@ -89,10 +89,14 @@ def get_stock_rate(settings: dict[str, list[str]]) -> list[dict[str, Any]]:
                     stock_rates.append(
                         {"stock": f"{stock}", "price": round(float(data["Global Quote"]["05. price"]), 2)}
                     )
+                else:
+                    print(f"Ошибка. Стоимость акций {stock} не определена")
+                    stock_rates.append({"stock": f"{stock}", "price": "Unknown"})
             time.sleep(1.2)
-        views_logger.info("Функция успешно завершила работу")
+        views_logger.info("Функция завершила работу")
         return stock_rates
-    views_logger.warning("Файл настроек пуст, стоимость акций не определена")
+    views_logger.warning("Ошибка. Стоимость акций не определена")
+    print("Ошибка. Отсутсвуют входные данные.")
     return stock_rates
 
 
@@ -100,11 +104,11 @@ def user_greeting() -> str:
     """ "Функция выводит приветствие пользователю в зависимости от времени суток."""
     current_time = datetime.now()
     str_current_time = current_time.strftime("%Y-%m-%d %H-%M-%S").split()
-    if "06-00-00" < str_current_time[1] < "12-00-00":
+    if "06-00-00" <= str_current_time[1] <= "11-59-59":
         greeting = "Доброе утро!"
-    elif "12-00-00" < str_current_time[1] < "18-00-00":
+    elif "12-00-00" <= str_current_time[1] <= "17-59-59":
         greeting = "Добрый день!"
-    elif "18-00-00" < str_current_time[1] < "23-00-00":
+    elif "18-00-00" <= str_current_time[1] <= "22-59-59":
         greeting = "Добрый вечер!"
     else:
         greeting = "Доброй ночи!"
@@ -130,14 +134,15 @@ def file_reader(input_date: str, filename: str) -> DataFrame:
             return DataFrame({})
         except Exception as e:
             views_logger.error("Ошибка чтения файла транзакций")
-            print(f"Возникла непредвиденная ошибка: {e}")
+            print(f"Возникла непредвиденная ошибка чтения файла: {e}")
             return DataFrame({})
         else:
             data["Дата операции"] = data["Дата операции"].map(
                 lambda date: datetime.strptime(date, "%d.%m.%Y %H:%M:%S")
             )
             filtered_data = data.loc[
-                (data["Дата операции"] <= end_date) & (data["Дата операции"] >= start_date) & (data["Статус"] == "OK")]
+                (data["Дата операции"] <= end_date) & (data["Дата операции"] >= start_date) & (data["Статус"] == "OK")
+            ]
             views_logger.info("Функция чтения файла транзакций успешно завершила работу")
             return filtered_data
     else:
@@ -192,7 +197,9 @@ def get_card_stats(operations: DataFrame) -> list[dict[str, Any]]:
                 {
                     "last_digits": index,
                     "total_spent": -1 * round(row["Сумма операции"], 2),
-                    "cashback": round(row["Кэшбэк"], 2)})
+                    "cashback": round(row["Кэшбэк"], 2),
+                }
+            )
         views_logger.info("Функция поиска операций по картам упешно завершила работу")
         return card_list
     else:
@@ -214,7 +221,7 @@ def main_page(date: str) -> str:
         "stock_prices": get_stock_rate(user_settings),
     }
     json_data = json.dumps(result, indent=4, ensure_ascii=False)
-    views_logger.info("Функция main_page заввершила работу")
+    views_logger.info("Функция main_page завершила работу")
     return json_data
 
 

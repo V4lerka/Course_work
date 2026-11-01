@@ -1,4 +1,4 @@
 {
   "user_currencies": ["USD", "EUR", "CNY"],
-  "user_stocks": ["NVDA"]
+  "user_stocks": ["NVDA", "AAPL", "MSFT"]
 }
