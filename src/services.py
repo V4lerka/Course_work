@@ -3,9 +3,11 @@ import json
 import os
 import re
 from typing import Any, Hashable
-from src.utils import services_logger
+
 import pandas as pd
 from pandas import DataFrame
+
+from src.utils import services_logger
 
 
 def excel_file_reader(filename: str) -> DataFrame:
@@ -57,7 +59,8 @@ def transform_expenses_to_list(operations: DataFrame, currency: str) -> list[dic
     валюте ({"дата": "сумма"})"""
     data = operations[["Дата операции", "Сумма операции", "Валюта операции", "Категория"]]
     expenses = data.loc[
-        (data["Категория"] != "Переводы") & (data["Сумма операции"] < 0) & (data["Валюта операции"] == currency)]
+        (data["Категория"] != "Переводы") & (data["Сумма операции"] < 0) & (data["Валюта операции"] == currency)
+    ]
     expenses = expenses[["Дата операции", "Сумма операции"]]
     expenses["Дата операции"] = expenses["Дата операции"].map(
         lambda date: datetime.datetime.strptime(date, "%d.%m.%Y %H:%M:%S")
@@ -74,8 +77,9 @@ def transform_expenses_to_list(operations: DataFrame, currency: str) -> list[dic
 def investment_bank(month: str, transactions: list[dict[Hashable, Any]], limit: int) -> float:
     """Вычисляет сумму, отложенную в инвест-копилку за определенный месяц,
     на основе округления трат до выбранного лимита (10, 50 или 100)."""
-    filtered_transactions = [transaction for transaction in transactions if
-                             month in str(transaction.get("Дата операции"))]
+    filtered_transactions = [
+        transaction for transaction in transactions if month in str(transaction.get("Дата операции"))
+    ]
     investment = 0.0
     if filtered_transactions:
         for transaction in filtered_transactions:
@@ -95,7 +99,8 @@ def find_remittance_to_people(operations: DataFrame) -> str:
     """Функция принимает дата-фрэйм и возвращает JSON с транзакциями, относящимися к успешным переводам людям"""
     pattern = r"\b[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\."
     remittance = operations.loc[
-        (operations["Категория"] == "Переводы") & (operations["Статус"] == "OK") & (operations["Описание"].notna())]
+        (operations["Категория"] == "Переводы") & (operations["Статус"] == "OK") & (operations["Описание"].notna())
+    ]
     remittance_filtered = remittance[
         remittance["Описание"].apply(lambda description: bool(re.search(pattern, description)))
     ]
