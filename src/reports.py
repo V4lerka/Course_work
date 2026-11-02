@@ -9,12 +9,14 @@ from dateutil.relativedelta import relativedelta
 from pandas import DataFrame
 
 from src.services import excel_file_reader
+from src.utils import reports_logger
 
 
 def reports_saver_decorator(
     filename: Optional[str] = None,
 ) -> Callable[[Any], Callable[[DataFrame, str, str | None], Any]]:
     """Декоратор сохраняет дата-фрэйм в файл с указанным именем"""
+    reports_logger.info("Вызов функции декоратора")
 
     def wrapper(func: Callable[[DataFrame, str, str], DataFrame]):
         @wraps(func)
@@ -26,6 +28,7 @@ def reports_saver_decorator(
 
         return inner
 
+    reports_logger.info("Функция декоратор завершила работу")
     return wrapper
 
 
@@ -50,14 +53,17 @@ def spending_by_category(transactions: pd.DataFrame, category: str, date: Option
         & (transactions["Дата операции"] < date_obj_end)
     ]
     if not transactions_filtered.empty:
+        reports_logger.info("Функция spending_by_category успешно завершила работу")
         return transactions_filtered
     else:
         print("Транзакции под условия фильтрации не найдены")
+        reports_logger.info("Функция spending_by_category завершила работу")
         return DataFrame({})
 
 
 if __name__ == "__main__":
     data = excel_file_reader("operations.xlsx")
+    reports_logger.info("Функция spending_by_category начала работу")
     df = spending_by_category(data, "Супермаркеты", "12.11.2019")
     if not df.empty:
         print(df[["Дата операции", "Номер карты", "Сумма операции"]].head())

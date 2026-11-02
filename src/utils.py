@@ -14,3 +14,7 @@ views_logger.setLevel(logging.DEBUG)
 services_logger = logging.getLogger("services")
 services_logger.addHandler(file_handler)
 services_logger.setLevel(logging.DEBUG)
+
+reports_logger = logging.getLogger("reports")
+reports_logger.addHandler(file_handler)
+reports_logger.setLevel(logging.DEBUG)
