@@ -2,7 +2,7 @@ import os
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
-from typing import Any, Optional
+from typing import Optional
 
 import pandas as pd
 from dateutil.relativedelta import relativedelta
@@ -12,9 +12,7 @@ from src.services import excel_file_reader
 from src.utils import reports_logger
 
 
-def reports_saver_decorator(
-    filename: Optional[str] = None,
-) -> Callable[[Any], Callable[[DataFrame, str, str | None], Any]]:
+def reports_saver_decorator(filename: Optional[str] = None):
     """Декоратор сохраняет дата-фрэйм в файл с указанным именем"""
     reports_logger.info("Вызов функции декоратора")
 
@@ -22,7 +20,12 @@ def reports_saver_decorator(
         @wraps(func)
         def inner(transactions: pd.DataFrame, category: str, date: Optional[str] = None) -> DataFrame:
             result = func(transactions, category, date)
-            full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../reports", f"{filename}"))
+            if filename is not None:
+                full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../reports", f"{filename}"))
+            else:
+                full_path = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "../reports", "default_report.xlsx")
+                )
             result.to_excel(full_path, sheet_name="Траты по категориям", index=False)
             return result
 
@@ -32,7 +35,7 @@ def reports_saver_decorator(
     return wrapper
 
 
-@reports_saver_decorator("report_categories.xlsx")
+@reports_saver_decorator()
 def spending_by_category(transactions: pd.DataFrame, category: str, date: Optional[str] = None) -> pd.DataFrame:
     """Функция принимает дата-фрэйм и возвращает траты по заданной категории за последние три месяца
     (от переданной даты) или от текущей даты."""
