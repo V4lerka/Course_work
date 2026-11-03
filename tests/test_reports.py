@@ -50,3 +50,19 @@ def test_spending_by_category_empty(spending_by_category_test_data, capsys):
     assert df_result.empty is True
     captured = capsys.readouterr()
     assert captured.out == "Транзакции под условия фильтрации не найдены\n"
+
+
+def test_spending_by_category_empty2(spending_by_category_test_data, capsys):
+    """Тест, если передан пустой дата-фрэйм"""
+    df_result = spending_by_category(pd.DataFrame(), "Супермаркеты", "25.06.2018")
+    assert df_result.empty is True
+    captured = capsys.readouterr()
+    assert captured.out == "Передан пустой дата-фрэйм. Ничего не найдено.\n"
+
+
+def test_spending_by_category_wrong(spending_by_category_test_data2, capsys):
+    """Тест, если не найден столбец в дата-фрэйм"""
+    df_result = spending_by_category(spending_by_category_test_data2, "Продукты", "25.06.2018")
+    assert df_result.empty is True
+    captured = capsys.readouterr()
+    assert "Ошибка" in captured.out

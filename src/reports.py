@@ -39,29 +39,37 @@ def reports_saver_decorator(filename: Optional[str] = None):
 def spending_by_category(transactions: pd.DataFrame, category: str, date: Optional[str] = None) -> pd.DataFrame:
     """Функция принимает дата-фрэйм и возвращает траты по заданной категории за последние три месяца
     (от переданной даты) или от текущей даты."""
-    if date is not None:
-        date_obj_end = datetime.strptime(date, "%d.%m.%Y")
-        date_obj_start = date_obj_end - relativedelta(months=3)
-    else:
-        date_obj_end = datetime.now()
-        date_obj_start = date_obj_end - relativedelta(months=3)
-    transactions["Дата операции"] = transactions["Дата операции"].map(
-        lambda x: datetime.strptime(x, "%d.%m.%Y %H:%M:%S")
-    )
-    transactions_filtered = transactions.loc[
-        (transactions["Категория"] == category)
-        & (transactions["Статус"] == "OK")
-        & (transactions["Сумма операции"] < 0)
-        & (transactions["Дата операции"] > date_obj_start)
-        & (transactions["Дата операции"] < date_obj_end)
-    ]
-    if not transactions_filtered.empty:
-        reports_logger.info("Функция spending_by_category успешно завершила работу")
-        return transactions_filtered
-    else:
-        print("Транзакции под условия фильтрации не найдены")
-        reports_logger.info("Функция spending_by_category завершила работу")
-        return DataFrame({})
+    if not transactions.empty:
+        try:
+            if date is not None:
+                date_obj_end = datetime.strptime(date, "%d.%m.%Y")
+                date_obj_start = date_obj_end - relativedelta(months=3)
+            else:
+                date_obj_end = datetime.now()
+                date_obj_start = date_obj_end - relativedelta(months=3)
+            transactions["Дата операции"] = transactions["Дата операции"].map(
+                lambda x: datetime.strptime(x, "%d.%m.%Y %H:%M:%S")
+            )
+            transactions_filtered = transactions.loc[
+                (transactions["Категория"] == category)
+                & (transactions["Статус"] == "OK")
+                & (transactions["Сумма операции"] < 0)
+                & (transactions["Дата операции"] > date_obj_start)
+                & (transactions["Дата операции"] < date_obj_end)
+            ]
+            if not transactions_filtered.empty:
+                reports_logger.info("Функция spending_by_category успешно завершила работу")
+                return transactions_filtered
+            else:
+                print("Транзакции под условия фильтрации не найдены")
+                reports_logger.info("Функция spending_by_category завершила работу")
+                return DataFrame()
+        except KeyError as e:
+            print(f"Ошибка. Не найден столбец {e}")
+            return DataFrame()
+    reports_logger.info("Функция spending_by_category завершила работу")
+    print("Передан пустой дата-фрэйм. Ничего не найдено.")
+    return DataFrame()
 
 
 if __name__ == "__main__":

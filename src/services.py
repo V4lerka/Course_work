@@ -16,7 +16,7 @@ def excel_file_reader(filename: str) -> DataFrame:
         full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data", f"{filename}"))
         try:
             services_logger.info("Попытка чтения файла транзакций")
-            data = pd.read_excel(full_path)
+            data = pd.read_excel(full_path, sheet_name="Отчет по операциям")
             services_logger.info("Функция excel_file_reader успешно завершила работу")
             return data
         except FileNotFoundError as e:
@@ -36,76 +36,110 @@ def get_best_cashback(month: int, year: int, data: DataFrame) -> str:
     """Функция принимает год, месяц и данные, выдает JSON с анализом, сколько на каждой категории можно заработать
     кешбэка в указанном месяце года"""
     result = {}
-    data_not_na = data[data["Дата платежа"].notnull()]
-    data_not_na["Дата платежа"] = data_not_na["Дата платежа"].map(
-        lambda date: datetime.datetime.strptime(date, "%d.%m.%Y")
-    )
-    filtered_data = data_not_na[data_not_na["Дата платежа"].map(lambda date: (date.year, date.month) == (year, month))]
-    agg_data = filtered_data.groupby(by="Категория").agg({"Кэшбэк": "sum"})
-    agg_data_with_cashback = agg_data[agg_data["Кэшбэк"] > 0].sort_values(by="Кэшбэк", ascending=False)
-    if not agg_data_with_cashback.empty:
-        for index, row in agg_data_with_cashback.iterrows():
-            result[index] = round(row["Кэшбэк"])
-        json_data = json.dumps(result, indent=4, ensure_ascii=False)
-        services_logger.info("Функция get_best_cashback успешно завершила работу")
-        return json_data
-    services_logger.info("Функция get_best_cashback успешно завершила работу")
-    print("Выгодные категории кэшбэка не найдены")
+    if not data.empty:
+        try:
+            data_not_na = data[data["Дата платежа"].notnull()]
+            data_not_na["Дата платежа"] = data_not_na["Дата платежа"].map(
+                lambda date: datetime.datetime.strptime(date, "%d.%m.%Y")
+            )
+            filtered_data = data_not_na[data_not_na["Дата платежа"].map(lambda date: (date.year, date.month) == (year, month))]
+            agg_data = filtered_data.groupby(by="Категория").agg({"Кэшбэк": "sum"})
+            agg_data_with_cashback = agg_data[agg_data["Кэшбэк"] > 0].sort_values(by="Кэшбэк", ascending=False)
+            if not agg_data_with_cashback.empty:
+                for index, row in agg_data_with_cashback.iterrows():
+                    result[index] = round(row["Кэшбэк"])
+                json_data = json.dumps(result, indent=4, ensure_ascii=False)
+                services_logger.info("Функция get_best_cashback успешно завершила работу")
+                return json_data
+            services_logger.info("Функция get_best_cashback успешно завершила работу")
+            print("Выгодные категории кэшбэка не найдены")
+            return json.dumps(result)
+        except KeyError as e:
+            print(f"Ошибка. Не найден столбец: {e}")
+            return json.dumps(result)
+    services_logger.info("Функция get_best_cashback завершила работу")
+    print("Передан пустой дата-фрэйм. Ничего не найдено.")
     return json.dumps(result)
 
 
 def transform_expenses_to_list(operations: DataFrame, currency: str) -> list[dict[Hashable, Any]]:
     """Функция принимает дата-фрэйм файла с операциями и возвращает упрощенный список трат в указанной
     валюте ({"дата": "сумма"})"""
-    data = operations[["Дата операции", "Сумма операции", "Валюта операции", "Категория"]]
-    expenses = data.loc[
-        (data["Категория"] != "Переводы") & (data["Сумма операции"] < 0) & (data["Валюта операции"] == currency)
-    ]
-    expenses = expenses[["Дата операции", "Сумма операции"]]
-    expenses["Дата операции"] = expenses["Дата операции"].map(
-        lambda date: datetime.datetime.strptime(date, "%d.%m.%Y %H:%M:%S")
-    )
-    expenses["Дата операции"] = expenses["Дата операции"].map(
-        lambda date: datetime.datetime.strftime(date, "%Y-%m-%d %H:%M:%S")
-    )
-    expenses["Дата операции"] = expenses["Дата операции"].map(lambda date: date.split()[0])
-    list_operations = expenses.to_dict(orient="records")
-    services_logger.info("Функция transform_expenses_to_list успешно завершила работу")
-    return list_operations
+    if not operations.empty:
+        try:
+            data = operations[["Дата операции", "Сумма операции", "Валюта операции", "Категория"]]
+            expenses = data.loc[
+                (data["Категория"] != "Переводы") & (data["Сумма операции"] < 0) & (data["Валюта операции"] == currency)
+            ]
+            expenses = expenses[["Дата операции", "Сумма операции"]]
+            expenses["Дата операции"] = expenses["Дата операции"].map(
+                lambda date: datetime.datetime.strptime(date, "%d.%m.%Y %H:%M:%S")
+            )
+            expenses["Дата операции"] = expenses["Дата операции"].map(
+                lambda date: datetime.datetime.strftime(date, "%Y-%m-%d %H:%M:%S")
+            )
+            expenses["Дата операции"] = expenses["Дата операции"].map(lambda date: date.split()[0])
+            list_operations = expenses.to_dict(orient="records")
+            services_logger.info("Функция transform_expenses_to_list успешно завершила работу")
+            return list_operations
+        except KeyError as e:
+            print(f"Ошибка. Не найден столбец: {e}")
+            return []
+    services_logger.info("Функция transform_expenses_to_list завершила работу")
+    print("Передан пустой дата-фрэйм. Ничего не найдено.")
+    return []
 
 
 def investment_bank(month: str, transactions: list[dict[Hashable, Any]], limit: int) -> float:
     """Вычисляет сумму, отложенную в инвест-копилку за определенный месяц,
     на основе округления трат до выбранного лимита (10, 50 или 100)."""
-    filtered_transactions = [
-        transaction for transaction in transactions if month in str(transaction.get("Дата операции"))
-    ]
-    investment = 0.0
-    if filtered_transactions:
-        for transaction in filtered_transactions:
-            amount = -1 * float(transaction.get("Сумма операции", 0))
-            if amount % limit == 0:
-                continue
-            rounded_amount = ((amount // limit) + 1) * limit
-            round_up_rest = float(rounded_amount) - amount
-            investment += round_up_rest
-        services_logger.info("Функция investment_bank успешно завершила работу")
-        return round(investment, 1)
-    services_logger.info("Функция investment_bank успешно завершила работу")
-    return investment
+    if transactions:
+        filtered_transactions = [
+            transaction for transaction in transactions if month in str(transaction.get("Дата операции"))
+        ]
+        investment = 0.0
+        if filtered_transactions:
+            for transaction in filtered_transactions:
+                amount = -1 * float(transaction.get("Сумма операции", 0))
+                if amount % limit == 0:
+                    continue
+                rounded_amount = ((amount // limit) + 1) * limit
+                round_up_rest = float(rounded_amount) - amount
+                investment += round_up_rest
+            services_logger.info("Функция investment_bank успешно завершила работу")
+            return round(investment, 1)
+        services_logger.info("Функция investment_bank завершила работу")
+        print("Операции, подходящие под условия фильтрации не найдены")
+        return investment
+    services_logger.info("Функция investment_bank завершила работу")
+    print("Список транзакций пуст")
+    return 0.0
 
 
 def find_remittance_to_people(operations: DataFrame) -> str:
     """Функция принимает дата-фрэйм и возвращает JSON с транзакциями, относящимися к успешным переводам людям"""
     pattern = r"\b[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\."
-    remittance = operations.loc[
-        (operations["Категория"] == "Переводы") & (operations["Статус"] == "OK") & (operations["Описание"].notna())
-    ]
-    remittance_filtered = remittance[
-        remittance["Описание"].apply(lambda description: bool(re.search(pattern, description)))
-    ]
-    services_logger.info("Функция find_remittance_to_people успешно завершила работу")
-    return remittance_filtered.to_json(orient="records", indent=4, force_ascii=False)
+    if not operations.empty:
+        try:
+            remittance = operations.loc[
+                (operations["Категория"] == "Переводы") & (operations["Статус"] == "OK") & (operations["Описание"].notna())
+            ]
+            if not remittance.empty:
+                remittance_filtered = remittance[
+                    remittance["Описание"].apply(lambda description: bool(re.search(pattern, description)))]
+                if not remittance_filtered.empty:
+                    services_logger.info("Функция find_remittance_to_people успешно завершила работу")
+                    return remittance_filtered.to_json(orient="records", indent=4, force_ascii=False)
+            services_logger.info("Функция find_remittance_to_people успешно завершила работу")
+            print("Транзакции не найдены")
+            return json.dumps({})
+        except KeyError as e:
+            services_logger.error("Ошибка работы функции find_remittance_to_people")
+            print(f"Ошибка. Столбец не найден {e}")
+            return json.dumps({})
+    services_logger.info("Функция find_remittance_to_people завершила работу")
+    print("Передан пустой дата-фрэйм. Ничего не найдено.")
+    return json.dumps({})
 
 
 if __name__ == "__main__":
