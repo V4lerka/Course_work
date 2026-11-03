@@ -42,7 +42,9 @@ def get_best_cashback(month: int, year: int, data: DataFrame) -> str:
             data_not_na["Дата платежа"] = data_not_na["Дата платежа"].map(
                 lambda date: datetime.datetime.strptime(date, "%d.%m.%Y")
             )
-            filtered_data = data_not_na[data_not_na["Дата платежа"].map(lambda date: (date.year, date.month) == (year, month))]
+            filtered_data = data_not_na[
+                data_not_na["Дата платежа"].map(lambda date: (date.year, date.month) == (year, month))
+            ]
             agg_data = filtered_data.groupby(by="Категория").agg({"Кэшбэк": "sum"})
             agg_data_with_cashback = agg_data[agg_data["Кэшбэк"] > 0].sort_values(by="Кэшбэк", ascending=False)
             if not agg_data_with_cashback.empty:
@@ -69,7 +71,9 @@ def transform_expenses_to_list(operations: DataFrame, currency: str) -> list[dic
         try:
             data = operations[["Дата операции", "Сумма операции", "Валюта операции", "Категория"]]
             expenses = data.loc[
-                (data["Категория"] != "Переводы") & (data["Сумма операции"] < 0) & (data["Валюта операции"] == currency)
+                (data["Категория"] != "Переводы")
+                & (data["Сумма операции"] < 0)
+                & (data["Валюта операции"] == currency)
             ]
             expenses = expenses[["Дата операции", "Сумма операции"]]
             expenses["Дата операции"] = expenses["Дата операции"].map(
@@ -122,11 +126,14 @@ def find_remittance_to_people(operations: DataFrame) -> str:
     if not operations.empty:
         try:
             remittance = operations.loc[
-                (operations["Категория"] == "Переводы") & (operations["Статус"] == "OK") & (operations["Описание"].notna())
+                (operations["Категория"] == "Переводы")
+                & (operations["Статус"] == "OK")
+                & (operations["Описание"].notna())
             ]
             if not remittance.empty:
                 remittance_filtered = remittance[
-                    remittance["Описание"].apply(lambda description: bool(re.search(pattern, description)))]
+                    remittance["Описание"].apply(lambda description: bool(re.search(pattern, description)))
+                ]
                 if not remittance_filtered.empty:
                     services_logger.info("Функция find_remittance_to_people успешно завершила работу")
                     return remittance_filtered.to_json(orient="records", indent=4, force_ascii=False)

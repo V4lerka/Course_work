@@ -1,6 +1,8 @@
-from src.reports import reports_saver_decorator, spending_by_category
 import os
+
 import pandas as pd
+
+from src.reports import reports_saver_decorator, spending_by_category
 
 
 def test_reports_saver_decorator():

@@ -1,9 +1,16 @@
-from src.services import excel_file_reader, find_remittance_to_people, get_best_cashback, investment_bank, \
-    transform_expenses_to_list
-from unittest.mock import mock_open, patch
-import os
-import pandas as pd
 import json
+import os
+from unittest.mock import patch
+
+import pandas as pd
+
+from src.services import (
+    excel_file_reader,
+    find_remittance_to_people,
+    get_best_cashback,
+    investment_bank,
+    transform_expenses_to_list,
+)
 
 
 def test_excel_file_reader_false_extension(capsys):
@@ -110,12 +117,14 @@ def test_investment_bank_ok(bank_transactions_test_data):
     result = investment_bank("11.2026", bank_transactions_test_data, 50)
     assert result == 34.5
 
+
 def test_investment_bank_empty_list(capsys):
     """Передан пустой список"""
     result = investment_bank("11.2026", [], 50)
     assert result == 0.0
     captured = capsys.readouterr()
     assert captured.out == "Список транзакций пуст\n"
+
 
 def test_investment_bank_not_found(bank_transactions_test_data, capsys):
     """Не найдены транзакции"""
@@ -156,4 +165,3 @@ def test_find_remittance_to_people_error(remittance_test_data3, capsys):
     assert result == json.dumps({})
     captured = capsys.readouterr()
     assert "Ошибка" in captured.out
-
